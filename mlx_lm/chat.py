@@ -1,7 +1,6 @@
 # Copyright © 2023-2024 Apple Inc.
 
 import argparse
-import json
 
 import mlx.core as mx
 
@@ -70,6 +69,11 @@ def setup_arg_parser():
         default=DEFAULT_MAX_TOKENS,
         help="Maximum number of tokens to generate",
     )
+    parser.add_argument(
+        "--system-prompt",
+        default=None,
+        help="System prompt to be used for the chat template",
+    )
     return parser
 
 
@@ -105,7 +109,10 @@ def main():
         if query == "h":
             print_help()
             continue
-        messages = [{"role": "user", "content": query}]
+        messages = []
+        if args.system_prompt is not None:
+            messages.append({"role": "system", "content": args.system_prompt})
+        messages.append({"role": "user", "content": query})
         prompt = tokenizer.apply_chat_template(messages, add_generation_prompt=True)
         for response in stream_generate(
             model,

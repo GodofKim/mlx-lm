@@ -3,7 +3,7 @@
 import math
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import mlx.core as mx
 import mlx.nn as nn
@@ -128,6 +128,14 @@ class DeepseekV3YarnRotaryEmbedding(nn.Module):
 @partial(mx.compile, shapeless=True)
 def clipped_silu(x):
     return mx.clip(x * mx.sigmoid(x), a_min=-100, a_max=100)
+
+
+class ClippedSilu(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def __call__(self, x):
+        return clipped_silu(x)
 
 
 class DeepseekV3Attention(nn.Module):
@@ -295,7 +303,9 @@ def group_expert_select(
     group_scores = mx.topk(scores, 2, axis=-1).sum(axis=-1, keepdims=True)
     k = n_group - topk_group
     group_idx = mx.argpartition(group_scores, kth=k - 1, axis=-2)[..., :k, :]
-    scores = mx.put_along_axis(scores, group_idx, mx.array(0.0), axis=-2)
+    scores = mx.put_along_axis(
+        scores, mx.stop_gradient(group_idx), mx.array(0.0), axis=-2
+    )
     scores = mx.flatten(scores, -2, -1)
 
     k = top_k
@@ -344,7 +354,7 @@ class DeepseekV3MoE(nn.Module):
             config.hidden_size,
             config.moe_intermediate_size,
             config.n_routed_experts,
-            activation=clipped_silu,
+            activation=ClippedSilu(),
         )
 
         self.gate = MoEGate(config)
@@ -529,6 +539,7 @@ class Model(nn.Module):
     def layers(self):
         return self.model.layers[self.model.start_idx : self.model.end_idx]
 
+    @property
     def cast_predicate(self):
         def predicate(k):
             return "e_score_correction_bias" not in k

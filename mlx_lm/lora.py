@@ -48,6 +48,9 @@ CONFIG_DEFAULTS = {
     "optimizer_config": {
         "adam": {},
         "adamw": {},
+        "muon": {},
+        "sgd": {},
+        "adafactor": {},
     },
     "data": "data/",
     "seed": 0,
@@ -67,7 +70,7 @@ CONFIG_DEFAULTS = {
     "config": None,
     "grad_checkpoint": False,
     "lr_schedule": None,
-    "lora_parameters": {"rank": 8, "dropout": 0.0, "scale": 10.0},
+    "lora_parameters": {"rank": 8, "dropout": 0.0, "scale": 20.0},
     "mask_prompt": False,
     "wandb": None,
     # ORPO args
@@ -114,9 +117,9 @@ def build_parser():
     parser.add_argument(
         "--optimizer",
         type=str,
-        choices=["adam", "adamw"],
+        choices=["adam", "adamw", "sgd", "adafactor"],
         default=None,
-        help="Optimizer to use for training: adam or adamw",
+        help="Optimizer to use for training: adam, adamw, sgd, or adafactor.",
     )
     parser.add_argument(
         "--mask-prompt",
@@ -232,6 +235,8 @@ def train_model(
     if args.fine_tune_type == "full":
         for l in model.layers[-max(args.num_layers, 0) :]:
             l.unfreeze()
+
+        args.lora_parameters = None
     elif args.fine_tune_type in ["lora", "dora"]:
         # Convert linear layers to lora/dora layers and unfreeze in the process
         linear_to_lora_layers(
@@ -263,11 +268,16 @@ def train_model(
 
     optimizer_name = args.optimizer.lower()
     optimizer_config = args.optimizer_config.get(optimizer_name, {})
-
     if optimizer_name == "adam":
         opt_class = optim.Adam
     elif optimizer_name == "adamw":
         opt_class = optim.AdamW
+    elif optimizer_name == "muon":
+        opt_class = optim.Muon
+    elif optimizer_name == "sgd":
+        opt_class = optim.SGD
+    elif optimizer_name == "adafactor":
+        opt_class = optim.Adafactor
     else:
         raise ValueError(f"Unsupported optimizer: {optimizer_name}")
 

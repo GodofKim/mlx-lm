@@ -11,6 +11,7 @@ import mlx.nn as nn
 import numpy as np
 from mlx.nn.utils import average_gradients
 from mlx.utils import tree_flatten
+from tqdm import tqdm
 
 from .callbacks import TrainingCallback
 from .datasets import CacheDataset
@@ -91,7 +92,7 @@ def iterate_batches(
     if isinstance(dataset, CacheDataset):
         len_fn = lambda idx: dataset.itemlen(idx)
     else:
-        len_fn = lambda idx: dataset[idx][1]
+        len_fn = lambda idx: len(dataset[idx][0])
     idx = sorted(range(len(dataset)), key=len_fn)
     if len(dataset) < batch_size:
         raise ValueError(
@@ -101,13 +102,14 @@ def iterate_batches(
 
     # If running in distributed mode (N machines) then each one should skip N-1
     # samples
+    offset = mx.distributed.init().rank()
     step = mx.distributed.init().size()
     if batch_size % step != 0:
         raise ValueError("The batch size must be divisible by the number of workers")
 
     # Make the batches:
     batch_idx = [
-        idx[i : i + batch_size : step]
+        idx[i + offset : i + offset + batch_size : step]
         for i in range(0, len(idx) - batch_size + 1, batch_size)
     ]
 
@@ -162,13 +164,17 @@ def evaluate(
 
     index_iterator = iter(range(num_batches)) if num_batches != -1 else iter(int, 1)
 
-    for _, batch in zip(
-        index_iterator,
-        iterate_batches(
-            dataset=dataset,
-            batch_size=batch_size,
-            max_seq_length=max_seq_length,
+    for _, batch in tqdm(
+        zip(
+            index_iterator,
+            iterate_batches(
+                dataset=dataset,
+                batch_size=batch_size,
+                max_seq_length=max_seq_length,
+            ),
         ),
+        desc="Calculating loss...",
+        total=min(len(dataset) // batch_size, num_batches),
     ):
         losses, toks = loss(model, *batch)
         all_losses += losses * toks
@@ -191,7 +197,8 @@ def train(
     iterate_batches: callable = iterate_batches,
     training_callback: TrainingCallback = None,
 ):
-    mx.set_wired_limit(mx.metal.device_info()["max_recommended_working_set_size"])
+    if mx.metal.is_available():
+        mx.set_wired_limit(mx.metal.device_info()["max_recommended_working_set_size"])
     print(f"Starting training..., iters: {args.iters}")
     world = mx.distributed.init()
     world_size = world.size()

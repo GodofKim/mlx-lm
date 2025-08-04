@@ -1,16 +1,13 @@
 # Copyright © 2024 Apple Inc.
 
-import math
 from dataclasses import dataclass
-from functools import partial
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Union
 
 import mlx.core as mx
 import mlx.nn as nn
 
-from .base import BaseModelArgs, create_attention_mask, scaled_dot_product_attention
+from .base import BaseModelArgs
 from .deepseek_v3 import DeepseekV3Model
-from .switch_layers import SwitchGLU
 
 
 @dataclass
@@ -113,6 +110,7 @@ class Model(nn.Module):
     def layers(self):
         return self.language_model.model.layers
 
+    @property
     def cast_predicate(self):
         def predicate(k):
             return "e_score_correction_bias" not in k

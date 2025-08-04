@@ -8,7 +8,7 @@ import mlx.nn as nn
 from mlx.utils import tree_flatten, tree_unflatten
 
 from . import llama
-from .base import BaseModelArgs, create_attention_mask, scaled_dot_product_attention
+from .base import BaseModelArgs
 
 
 @dataclass
@@ -32,8 +32,11 @@ class Model(nn.Module):
         inputs: mx.array,
         cache=None,
         mask: Optional[mx.array] = None,
+        input_embeddings: Optional[mx.array] = None,
     ):
-        return self.language_model(inputs, cache=cache, mask=mask)
+        return self.language_model(
+            inputs, cache=cache, mask=mask, input_embeddings=input_embeddings
+        )
 
     def sanitize(self, weights):
         weights = tree_unflatten(list(weights.items()))

@@ -1,4 +1,5 @@
 # Copyright © 2024 Apple Inc.
+import copy
 import unittest
 
 import mlx.core as mx
@@ -230,6 +231,9 @@ class TestModels(unittest.TestCase):
             self.assertEqual(outputs.shape, (1, 1, vocab_size))
             self.assertEqual(outputs.dtype, t)
 
+        # Make sure the model can be copied / pickled
+        copy.deepcopy(model)
+
     def test_llama(self):
         from mlx_lm.models import llama
 
@@ -247,6 +251,51 @@ class TestModels(unittest.TestCase):
             model, args.model_type, args.vocab_size, args.num_hidden_layers
         )
 
+    def test_lfm2(self):
+        from mlx_lm.models import lfm2
+
+        args = lfm2.ModelArgs(
+            model_type="lfm2",
+            hidden_size=1024,
+            num_hidden_layers=4,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            norm_eps=1e-5,
+            vocab_size=10_000,
+            full_attn_idxs=[0, 1, 2],
+            rope_theta=10000,
+            block_dim=1024,
+            block_ffn_dim_multiplier=1.5,
+            block_auto_adjust_ff_dim=True,
+            block_ff_dim=2048,
+            block_multiple_of=256,
+            max_position_embeddings=1000,
+            conv_bias=True,
+            conv_L_cache=3,
+        )
+        model = lfm2.Model(args)
+        self.model_test_runner(
+            model, args.model_type, args.vocab_size, args.num_hidden_layers
+        )
+
+    def test_bitnet(self):
+        from mlx_lm.models import bitnet
+
+        args = bitnet.ModelArgs(
+            model_type="bitnet",
+            hidden_size=1024,
+            num_hidden_layers=4,
+            intermediate_size=2048,
+            num_attention_heads=4,
+            num_key_value_heads=4,
+            rms_norm_eps=1e-5,
+            vocab_size=10_000,
+        )
+        model = bitnet.Model(args)
+        self.model_test_runner(
+            model, args.model_type, args.vocab_size, args.num_hidden_layers
+        )
+
     def test_phi2(self):
         from mlx_lm.models import phi
 
@@ -255,15 +304,6 @@ class TestModels(unittest.TestCase):
         self.model_test_runner(
             model, args.model_type, args.vocab_size, args.num_hidden_layers
         )
-
-    def test_phixtral(self):
-        from mlx_lm.models import phixtral
-
-        args = phixtral.ModelArgs(
-            "phixtral", num_vocab=1000, num_layers=4, model_dim=1024
-        )
-        model = phixtral.Model(args)
-        self.model_test_runner(model, args.model_type, args.num_vocab, args.num_layers)
 
     def test_phi3(self):
         from mlx_lm.models import phi3
@@ -1067,6 +1107,23 @@ class TestModels(unittest.TestCase):
         model = internlm3.Model(args)
         self.model_test_runner(
             model, args.model_type, args.vocab_size, args.num_hidden_layers
+        )
+
+    def test_smollm3(self):
+        from mlx_lm.models import smollm3
+
+        args = smollm3.ModelArgs(
+            model_type="smollm3",
+            hidden_size=1024,
+            num_hidden_layers=4,
+            intermediate_size=2048,
+            num_attention_heads=4,
+            rms_norm_eps=1e-5,
+            vocab_size=10_000,
+        )
+        model = smollm3.Model(args)
+        self.model_test_runner(
+            model, "smollm3", args.vocab_size, args.num_hidden_layers
         )
 
 
